@@ -20,17 +20,23 @@ import com.example.twitter.AuthConstants;
 public class TwitterKafkaProducer {
 
 	private static final String topic = "twitter-topic";
-
-	public static void run() throws InterruptedException {
-
+	
+	public kafka.javaapi.producer.Producer<String, String> initialize(){
+		
 		Properties properties = new Properties();
 		properties.put("metadata.broker.list", "localhost:9092");
 		properties.put("serializer.class", "kafka.serializer.StringEncoder");
 		properties.put("client.id","camus");
 		ProducerConfig producerConfig = new ProducerConfig(properties);
 		kafka.javaapi.producer.Producer<String, String> producer = new kafka.javaapi.producer.Producer<String, String>(
-				producerConfig);
-
+				producerConfig);	
+		return producer;
+		
+	}
+	
+	
+	public void publishMessage(kafka.javaapi.producer.Producer<String, String> producer) throws InterruptedException {
+		
 		BlockingQueue<String> queue = new LinkedBlockingQueue<String>(10000);
 		StatusesFilterEndpoint endpoint = new StatusesFilterEndpoint();
 		// add some track terms
@@ -45,14 +51,13 @@ public class TwitterKafkaProducer {
 		Client client = new ClientBuilder().hosts(Constants.STREAM_HOST)
 				.endpoint(endpoint).authentication(auth)
 				.processor(new StringDelimitedProcessor(queue)).build();
-
 		// Establish a connection
 		client.connect();
-		System.out.println("Message:");
-		System.out.println("Message:" + queue.take());
+
+
 
 		// Do whatever needs to be done with messages
-		for (int msgRead = 0; msgRead < 1000; msgRead++) {
+		for (int msgRead = 0; msgRead < 10000; msgRead++) {
 			KeyedMessage<String, String> message = null;
 			try {
 				message = new KeyedMessage<String, String>(topic, queue.take());
@@ -62,14 +67,23 @@ public class TwitterKafkaProducer {
 			}
 			producer.send(message);
 		}
-		producer.close();
+		
 		client.stop();
 
 	}
 
 	public static void main(String[] args) {
 		try {
-			TwitterKafkaProducer.run();
+			TwitterKafkaProducer kafkaproducer = new TwitterKafkaProducer();
+			
+			//Initialize Producer
+			kafka.javaapi.producer.Producer<String, String> producer = kafkaproducer.initialize();
+			
+			//Publish Message
+			kafkaproducer.publishMessage(producer);
+			
+			//Close Producer
+			producer.close();
 		} catch (InterruptedException e) {
 			System.out.println(e);
 		}
